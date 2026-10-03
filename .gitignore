@@ -1,0 +1,26 @@
+# Secrets — never commit
+*.pem
+*.key
+*.ovpn
+.env
+.env.*
+secrets/
+**/credentials*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Terraform (added in later phase)
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+terraform.tfvars
+
+# Local overrides
+*.local
+override/
