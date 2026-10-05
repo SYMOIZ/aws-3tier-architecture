@@ -1,65 +1,37 @@
-# Diagram Progression (Beginner-Friendly)
+# Diagram Progression
 
-Start simple; add detail only after each layer makes sense.
-
-## Step A — User and three tiers
-
-```mermaid
-flowchart TB
-  U([Employee browser])
-  T1[Presentation]
-  T2[Application]
-  T3[(Database)]
-  U --> T1 --> T2 --> T3
-```
-
-## Step B — Add public vs private boxes
+## Step A — Two layers
 
 ```mermaid
 flowchart TB
   subgraph Public
-    ALB[Load Balancer]
-    VPN[VPN]
+    ALB[ALB]
+    SQ[Squid]
+    VPN[OpenVPN]
   end
   subgraph Private
     FE[Frontend]
     BE[Backend]
-    DB[(Database)]
   end
   Internet([Internet]) --> ALB
   Internet --> VPN
   ALB --> FE
-  FE --> BE
-  BE --> DB
-  VPN -.-> FE
-  VPN -.-> BE
-```
-
-## Step C — Add Squid for outbound
-
-```mermaid
-flowchart LR
-  BE[Backend]
-  FE[Frontend]
-  SQ[Squid]
-  NET([Internet])
+  ALB --> BE
   FE --> SQ
   BE --> SQ
-  SQ --> NET
+  VPN -.-> FE
+  VPN -.-> BE
+  SQ --> Internet
 ```
 
-## Reference — corrected security group names
+## Step B — ALB path rules
 
-Aligned with [../../architecture/security-group-matrix.md](../../architecture/security-group-matrix.md):
+```text
+ALB :80
+  ├─ default  → Frontend :80
+  └─ /api/*   → Backend  :8000
+```
 
-| SG | Attached to |
-|----|-------------|
-| ALB-SG | Load balancer |
-| VPN-SG | OpenVPN server |
-| PROXY-SG | Squid |
-| WEB-SG | Frontend |
-| BACKEND-SG | Backend |
-| CONNECT-SG | Frontend & Backend (SSH from VPN) |
-| DB-SG | Database |
+## Security group names (SOP)
 
-Friend’s diagram used `APP-SG` for the load balancer; this repo uses **ALB-SG** to avoid confusion with “application tier.”
+APP-SG · Web-SG · Backend-SG · Proxy-SG · Remote-SG · VPN-SG · Connect-SG

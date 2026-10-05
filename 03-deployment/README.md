@@ -1,27 +1,14 @@
 # Part 03 — Deploy and Configure the Application
 
-## Objective
+Sample apps are installed by **user-data** in Phase 7:
 
-Install and configure software **after** Part 02 infrastructure exists.
+| Host | User-data | Service |
+|------|-----------|---------|
+| Frontend | [../userdata/frontend.sh](../userdata/frontend.sh) | Nginx + sample HTML calling `/api/info` |
+| Backend | [../userdata/backend.sh](../userdata/backend.sh) | Python `ThreadingHTTPServer` on :8000 (`/api/health`, `/api/*`) |
 
-## Planned contents
+Replace the sample page/API with your real application later; keep ports **80** / **8000**, proxy env, and systemd layout.
 
-| Folder | Contents |
-|--------|----------|
-| `frontend/` | nginx, static build, reverse proxy to backend |
-| `backend/` | API service, env vars, systemd unit, health `/health` |
-| `database/` | Schema migrations, connection string from backend only |
-| `vpn/` | Client `.ovpn` generation (gitignored templates only) |
-| `monitoring/` | CloudWatch agent basics |
+## VPN client profiles
 
-## Dependency
-
-Do not deploy applications until:
-
-- Frontend/backend EC2 pass SSH via VPN
-- Backend reaches database on 5432
-- Squid proxy works from private instances (`curl -x http://squid:8888 https://example.com`)
-
-## What comes next?
-
-Wait for Part 02 EC2 and database steps, then follow subfolders as they are added.
+Generated on the OpenVPN server with `sudo make-client <name> <EIP>`. Copy `.ovpn` to your PC; treat like a password (gitignored).

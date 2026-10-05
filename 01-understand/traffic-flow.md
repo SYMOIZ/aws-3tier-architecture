@@ -1,55 +1,30 @@
 # Traffic Flow
 
-## Objective
-
-Describe how packets move for each use case.
-
 ## 1. Employee opens the website
 
 ```text
-Browser → Internet → ALB:443/80 → Frontend:80 → (static/UI)
+Browser → Internet → ALB:80 → Frontend:80
+Browser → ALB:80 /api/* → Backend:8000
 ```
 
-API calls from the browser (same origin or configured API path):
+The frontend page calls `/api/info`; the ALB path rule sends `/api/*` to the Backend target group.
+
+## 2. Administrator SSH
 
 ```text
-Browser → ALB → Frontend → Backend:8000 → PostgreSQL:5432
+Admin laptop → OpenVPN:1194 → tunnel → Frontend|Backend:22 (Connect-SG ← VPN-SG)
 ```
 
-The backend is **not** registered as a public ALB target in the default design.
-
-## 2. Administrator SSH to frontend
+## 3. Private instance downloads packages
 
 ```text
-Admin laptop → OpenVPN:1194 → VPN tunnel → Frontend:22
+Frontend|Backend → Squid:8888 → Internet
 ```
 
-Security group **Connect-SG** allows SSH only from **VPN-SG**.
+`http_proxy` / apt proxy point at `http://10.0.1.10:8888`. Direct internet (`--noproxy '*'`) times out because the private route table has no IGW/NAT route.
 
-## 3. Backend calls the database
+## 4. What must never happen
 
-```text
-Backend → DB:5432 (DB-SG allows backend SG only)
-```
-
-## 4. Private instance downloads packages
-
-```text
-Backend → Squid:8888 → Internet
-```
-
-Instances use `http_proxy` / `https_proxy` environment variables or apt/yum proxy settings pointing at Squid.
-
-## 5. What must never happen
-
-- Internet → Backend:8000 directly
-- Internet → Database:5432
+- Internet → Backend:8000 without ALB
 - `0.0.0.0/0` on SSH for private instances
-
-## Validation mindset
-
-After each Part 02 step, you will run checks listed in that step’s **Validation** section (e.g. `curl` via ALB, `psql` from backend only).
-
-## What comes next?
-
-[diagrams/concept-progression.md](diagrams/concept-progression.md)
+- Backend package installs without Proxy-SG allowing Backend-SG

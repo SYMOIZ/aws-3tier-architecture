@@ -1,10 +1,7 @@
-# Architecture Traffic Flow (Reference)
+# Architecture Traffic Flow (SOP)
 
-Same content as [../01-understand/traffic-flow.md](../01-understand/traffic-flow.md), kept here for operators who jump straight to `architecture/`.
-
-Primary paths:
-
-1. **Web:** Internet → ALB → Frontend  
-2. **API:** Frontend → Backend → Database  
-3. **Admin:** Internet → VPN → SSH to private instances  
-4. **Egress:** Frontend/Backend → Squid → Internet  
+1. **Web:** `Internet → ALB:80 → Frontend:80`
+2. **API:** `Internet → ALB:80 /api/* → Backend:8000`
+3. **Admin:** `Internet → OpenVPN:1194 → SSH Frontend/Backend:22`
+4. **Egress:** `Frontend|Backend → Squid:8888 → Internet`
+5. **Admin public boxes:** `MyIP → Squid|VPN:22`

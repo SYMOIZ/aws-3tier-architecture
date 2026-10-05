@@ -1,47 +1,22 @@
-# Security Group Matrix
+# Security Group Matrix (SOP)
 
-Replace `MY_IP/32` with your public IP. Replace `sg-xxx` references with IDs after creation.
+Outbound rules stay at the default (all traffic allowed) for every group.  
+`MyIP` = your current public IP with `/32`. If it changes, run `scripts/update-my-ip.sh`.
 
 ## Inbound rules
 
-| Source | Destination | Port | Protocol | Purpose |
-|--------|-------------|------|----------|---------|
-| 0.0.0.0/0 | ALB-SG | 80 | TCP | Public HTTP (lab; add 443 later) |
-| MY_IP/32 | VPN-SG | 1194 | UDP | OpenVPN |
-| MY_IP/32 | VPN-SG | 22 | TCP | Emergency SSH to VPN box (optional) |
-| MY_IP/32 | PROXY-SG | 22 | TCP | SSH to Squid (admin) |
-| ALB-SG | WEB-SG | 80 | TCP | LB to frontend |
-| VPN-SG | CONNECT-SG | 22 | TCP | SSH to app servers via VPN |
-| WEB-SG | BACKEND-SG | 8000 | TCP | Frontend to API |
-| BACKEND-SG | DB-SG | 5432 | TCP | API to PostgreSQL |
+| Security group | Attached to | Protocol / port | Source | Why |
+|----------------|-------------|-----------------|--------|-----|
+| APP-SG | ALB | TCP 80 | 0.0.0.0/0 | Public web traffic |
+| Web-SG | Frontend | TCP 80 | APP-SG | Only the ALB may reach the web UI |
+| Backend-SG | Backend | TCP 8000 | APP-SG | Only the ALB may reach the API |
+| Proxy-SG | Squid | TCP 8888 | Web-SG **and** Backend-SG | Private servers use the proxy |
+| Remote-SG | Squid, OpenVPN | TCP 22 | MyIP/32 | You administer public servers |
+| VPN-SG | OpenVPN | UDP 1194 | MyIP/32 | Your OpenVPN client connects |
+| Connect-SG | Frontend, Backend | TCP 22 | VPN-SG | SSH only from inside the VPN |
 
-## Outbound rules
+**SOP fix vs diagram gap:** Proxy-SG must allow **Backend-SG** as well as Web-SG, or Backend cannot install packages through Squid.
 
-Default: allow outbound as needed. Tighten in production:
+## Why Connect-SG works with VPN-SG
 
-| Source | Destination | Port | Purpose |
-|--------|-------------|------|---------|
-| WEB-SG | PROXY-SG | 8888 | Frontend egress via Squid |
-| BACKEND-SG | PROXY-SG | 8888 | Backend egress via Squid |
-| BACKEND-SG | DB-SG | 5432 | Database |
-| PROXY-SG | 0.0.0.0/0 | 443,80 | Squid fetches internet |
-
-## Not allowed (verify absent)
-
-| Rule | Why bad |
-|------|---------|
-| 0.0.0.0/0 → BACKEND-SG:8000 | Exposes API |
-| 0.0.0.0/0 → DB-SG:5432 | Exposes database |
-| 0.0.0.0/0 → CONNECT-SG:22 | SSH from world |
-
-## Friend diagram mapping
-
-| Friend name | This repo |
-|-------------|-----------|
-| APP-SG (LB) | ALB-SG |
-| Web-SG | WEB-SG |
-| Backend-SG | BACKEND-SG |
-| Proxy-SG | PROXY-SG |
-| VPN-SG | VPN-SG |
-| Connect-SG | CONNECT-SG |
-| Remote-SG (SSH MyIP) | Merged into VPN/PROXY admin SSH rules |
+The OpenVPN server NATs tunnel traffic to its own private IP. Packets to Frontend/Backend therefore come from an instance that carries **VPN-SG**, so the Connect-SG rule matches.

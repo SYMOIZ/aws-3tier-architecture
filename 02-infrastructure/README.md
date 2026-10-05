@@ -1,55 +1,34 @@
-# Part 02 — Build AWS Infrastructure
+# Part 02 — Build AWS Infrastructure (SOP phases)
 
-## Objective
+Follow this order. Do not skip validation between major steps.
 
-Create AWS resources in **dependency order**. Do not skip validation between major steps.
+| Phase | Script / action | Why |
+|-------|-----------------|-----|
+| 1 | IAM + Resource Group ([01-iam/](01-iam/)) | Least-privilege deployer before infra |
+| 2 | [scripts/01-network.sh](../scripts/01-network.sh) | VPC/subnets/IGW/routes |
+| 3 | [scripts/02-security-groups.sh](../scripts/02-security-groups.sh) | Seven SGs from the matrix |
+| 4 | [scripts/03-keypair-ami.sh](../scripts/03-keypair-ami.sh) | ED25519 key + Ubuntu 24.04 AMI |
+| 5 | [scripts/04-squid.sh](../scripts/04-squid.sh) | Egress proxy **before** private apps |
+| 6 | [scripts/05-openvpn.sh](../scripts/05-openvpn.sh) | Admin path into private subnet |
+| 7 | [scripts/06-app-servers.sh](../scripts/06-app-servers.sh) | Frontend + Backend (need Squid) |
+| 8 | [scripts/07-alb.sh](../scripts/07-alb.sh) | Public entry; needs healthy targets |
+| 9 | Client `.ovpn` + connect | SSH to private IPs |
+| — | [scripts/99-teardown.sh](../scripts/99-teardown.sh) | Stop charges |
 
-## Status
+## Prerequisites
 
-Step folders and CLI/IaC implementations are added **one phase at a time** after Part 01. Use this document as the master sequence when those steps land.
-
-## Deployment order and why
-
-| Step | Folder (planned) | Why this order |
-|------|------------------|----------------|
-| 01 | `01-prerequisites/` | Region, AWS CLI, naming, **your public IP** |
-| 02 | `02-iam/` | Roles/policies before EC2 instance profiles |
-| 03 | `03-vpc/` | Network container for everything else |
-| 04 | `04-subnets/` | Requires VPC CIDR plan |
-| 05 | `05-routing/` | IGW + route tables need subnets |
-| 06 | `06-security-groups/` | Requires VPC ID; before any ENI |
-| 07 | `07-network-validation/` | Prove routes/SG before compute |
-| 08 | `07-vpn/` | Admin path into private subnets |
-| 09 | `08-forward-proxy-squid/` | Egress path for private instances |
-| 10 | `09-ec2/` | Compute needs subnets + SGs + proxy/VPN |
-| 11 | `09-database/` | Backend needs connection target |
-| 12 | `10-load-balancer/` | Needs healthy frontend targets |
-| 13 | `13-monitoring-logging/` | Operate running stack |
-
-## Cost gates (read before creating)
-
-Stop and read [../docs/cost.md](../docs/cost.md) before:
-
-- Creating an **Application Load Balancer**
-- Creating **RDS** (Free Tier eligible but not “free forever”)
-- Allocating **Elastic IPs** you leave unattached
-
-NAT Gateway is **not** in the default path.
-
-## Documentation template
-
-Each step file will follow:
-
-`Objective → Why → Architecture → Prerequisites → AWS Configuration → CLI → Validation → Troubleshooting → Cleanup → What’s Next`
-
-## What comes next?
-
-Wait for Phase B implementation, or start with prerequisites you control today:
+- AWS CLI v2, Git Bash (Windows) or WSL
+- Admin/root for Phase 1 only, then use `3tier-deployer`
+- Working directory: `scripts/` (creates `ids.sh` and `3tier-key.pem`)
 
 ```bash
+cd scripts
+source ./vars.sh
+echo "$MY_IP"
 aws sts get-caller-identity
-aws configure get region
-curl -s https://checkip.amazonaws.com
 ```
 
-Save your IP as `MY_IP/32` for VPN and Squid SSH rules.
+## Cost gates
+
+Before Phase 8 (ALB): ALB is **not** Free Tier — see [../docs/cost.md](../docs/cost.md).  
+Elastic IP is free while attached to a running instance; release on teardown.

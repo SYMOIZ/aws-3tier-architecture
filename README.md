@@ -1,155 +1,78 @@
 # Secure AWS 3-Tier Architecture
 
-A **learning-first, deployable** guide that builds a real AWS three-tier application from zero: public edge services, private application servers, a private database, **OpenVPN** for admin access, and **Squid** for controlled outbound internet (no NAT Gateway in the default design).
+Learning-first, **deployable** AWS lab: Application Load Balancer, **Squid** forward proxy, **OpenVPN**, private Frontend (Nginx) and Backend (Python API). No NAT Gateway — private servers reach the internet only through Squid; you reach them only through OpenVPN.
 
-## Project purpose
+Based on the SOP: *AWS 3-Tier Architecture with Squid Proxy & OpenVPN* (Syed Faizan Jafri, Oct 2026).
 
-You will learn **what** each AWS piece does, **why** it exists, **in what order** to create it, and **how** to validate, operate, and tear everything down—without jumping straight to a black-box Terraform stack.
+## What we are building
 
-## Business use case
+```text
+Internet
+   │
+   ├─► ALB :80  ──default──► Frontend :80   (10.0.11.10)
+   │            ──/api/*───► Backend  :8000 (10.0.11.20)
+   │
+   └─► OpenVPN :1194 (MyIP) ──tunnel──► SSH to Frontend/Backend
 
-**NexusOps Ltd.** runs an internal operations portal for employees and branch offices:
-
-- **Presentation tier:** web UI (nginx + static/SSR frontend)
-- **Application tier:** REST API (backend on port 8000)
-- **Data tier:** PostgreSQL (private; not reachable from the internet)
-
-Requirements: public web entry via a load balancer, private API and database, VPN for administrators, segmented security groups, outbound internet only through a forward proxy, backups and monitoring as later steps.
-
-Details: [01-understand/business-use-case.md](01-understand/business-use-case.md)
-
-## What is 3-tier architecture?
-
-| Tier | Role | In this project |
-|------|------|-----------------|
-| Presentation | User interface | Frontend EC2 (private subnet) |
-| Application | Business logic / API | Backend EC2 (private subnet) |
-| Data | Persistent storage | PostgreSQL (private DB subnet) |
-
-Concepts: [01-understand/what-is-3-tier.md](01-understand/what-is-3-tier.md)
-
-## High-level architecture
-
-```mermaid
-flowchart TB
-  Internet([Internet])
-  ALB[Application Load Balancer\npublic subnet]
-  VPN[OpenVPN\npublic subnet]
-  Squid[Squid forward proxy\npublic subnet]
-  FE[Frontend\nprivate app subnet]
-  BE[Backend\nprivate app subnet]
-  DB[(PostgreSQL\nprivate DB subnet)]
-
-  Internet --> ALB
-  Internet --> VPN
-  ALB --> FE
-  FE --> BE
-  BE --> DB
-  VPN -. admin SSH .-> FE
-  VPN -. admin SSH .-> BE
-  FE --> Squid
-  BE --> Squid
-  Squid --> Internet
+Frontend / Backend ──► Squid :8888 ──► Internet (outbound only)
 ```
 
-**Public layer:** resources that can have a route to an Internet Gateway (ALB, VPN, Squid).  
-**Private layer:** no direct inbound internet; reach via ALB (frontend only) or VPN (admin).
+| Component | Subnet | Private IP | Security groups |
+|-----------|--------|------------|-----------------|
+| ALB | public-a + public-b | AWS-managed | APP-SG |
+| Squid | public-a | 10.0.1.10 | Remote-SG, Proxy-SG |
+| OpenVPN | public-a | 10.0.1.20 (+ EIP) | VPN-SG, Remote-SG |
+| Frontend | private-a | 10.0.11.10 | Web-SG, Connect-SG |
+| Backend | private-a | 10.0.11.20 | Backend-SG, Connect-SG |
 
-## Public vs private infrastructure
+**Region example:** `ap-south-1` (Mumbai). **OS:** Ubuntu Server 24.04 LTS. **Size:** `t3.micro`.
 
-| Layer | Subnets | Examples |
-|-------|---------|----------|
-| Public | `10.0.1.0/24` (example) | ALB, OpenVPN, Squid |
-| Private app | `10.0.10.0/24` | Frontend, Backend |
-| Private data | `10.0.20.0/24` | Database |
-
-More: [01-understand/public-vs-private.md](01-understand/public-vs-private.md)
-
-## Technology stack
-
-| Area | Choice | Notes |
-|------|--------|--------|
-| Network | VPC, IGW, route tables, security groups | Manual steps first |
-| Edge | Application Load Balancer | **Paid** — see [docs/cost.md](docs/cost.md) |
-| Admin access | OpenVPN on EC2 (UDP 1194) | Restrict source to your IP |
-| Outbound | Squid (TCP 8888) | Alternative to NAT Gateway for labs |
-| Compute | Amazon Linux 2023 or Ubuntu 24.04 | t3.micro where Free Tier applies |
-| Database | RDS PostgreSQL `db.t3.micro` (default doc path) | Free Tier eligible 12 months for new accounts |
-| IaC | AWS CLI + docs; Terraform in a later phase | After manual flow is understood |
-
-## Deployment roadmap
-
-| Part | Folder | Status |
-|------|--------|--------|
-| 1 — Understand | [01-understand/](01-understand/) | **Available now** |
-| 2 — Build infrastructure | [02-infrastructure/](02-infrastructure/) | Next phase (step-by-step) |
-| 3 — Deploy application | [03-deployment/](03-deployment/) | After Part 2 |
-| 4 — Test & operate | [04-operations/](04-operations/) | After Part 3 |
-
-Correct build order (dependencies): [02-infrastructure/README.md](02-infrastructure/README.md)
-
-## Repository structure
-
-```
-aws-3tier-architecture/
-├── README.md                 ← start here
-├── 01-understand/            ← concepts & diagrams
-├── 02-infrastructure/        ← AWS build steps (in order)
-├── 03-deployment/            ← app install & config
-├── 04-operations/            ← test, troubleshoot, cleanup
-├── architecture/             ← reference diagrams & SG matrix
-├── iam/                      ← policies & roles (JSON)
-├── scripts/                  ← validation & cleanup helpers
-└── docs/                     ← cost, security, decisions
-```
-
-## Estimated cost (learning environment)
-
-Nothing in this repo creates AWS resources by itself. When you deploy:
-
-| Service | Free Tier / cost note |
-|---------|------------------------|
-| EC2 t3.micro | Often Free Tier eligible (750 h/month, 12 mo) |
-| RDS db.t3.micro | Often Free Tier eligible (750 h, 20 GB) |
-| **Application Load Balancer** | **~$16+/month + LCU** — not Free Tier |
-| Elastic IP | Free while attached to running instance; charges if idle |
-| **NAT Gateway** | **Not used** in default design (Squid instead) |
-| Data transfer | Variable — monitor in Cost Explorer |
-
-Full breakdown: [docs/cost.md](docs/cost.md)
-
-## Security considerations
-
-- Security groups are **deny by default**; only documented flows are opened.
-- Database has **no** ingress from `0.0.0.0/0`.
-- SSH from internet is **not** used on private instances; use **VPN → Connect-SG**.
-- Replace `MyIP/32` placeholders with your current public IP before deploy.
-- Do not commit `.pem`, `.ovpn`, or `.env` files ([.gitignore](.gitignore)).
-
-Matrix: [architecture/security-group-matrix.md](architecture/security-group-matrix.md)
-
-## How to use this repository
-
-1. Read [01-understand/README.md](01-understand/README.md).
-2. Skim [architecture/high-level.md](architecture/high-level.md).
-3. When Part 2 is published for each step, follow **one step at a time** and run validation before continuing.
-4. Use Git Bash on Windows for CLI examples:
+## Quick start (Git Bash)
 
 ```bash
 cd "/c/Users/symoi/Desktop/New folder/aws-3tier-architecture"
-aws sts get-caller-identity
+
+# 1) Read Part 01 concepts
+# 2) Phase 1 IAM (console) — see 02-infrastructure/01-iam/
+# 3) Deploy network → ALB:
+cd scripts
+bash 00-resource-group.sh   # optional after IAM
+bash 01-network.sh && bash 02-security-groups.sh && bash 03-keypair-ami.sh \
+  && bash 04-squid.sh && bash 05-openvpn.sh && bash 06-app-servers.sh && bash 07-alb.sh
 ```
 
-## Defaults (you can change in Part 2)
+**Cost warning:** ALB, Elastic IP (if idle), and public IPv4 are billed. Teardown with `bash 99-teardown.sh` when finished. Details: [docs/cost.md](docs/cost.md).
 
-- **Region:** set in `02-infrastructure/01-prerequisites/` (e.g. `ap-south-1` or `us-east-1`)
-- **Availability zones:** 1 AZ for minimal cost first; 2 AZ documented as HA upgrade
-- **Traffic path:** `Internet → ALB → Frontend → Backend → Database` (backend not exposed directly to ALB)
+## Repository map
 
-## Friend’s diagram vs this repo
+| Path | Purpose |
+|------|---------|
+| [01-understand/](01-understand/) | Concepts before AWS |
+| [02-infrastructure/](02-infrastructure/) | Phase guide matching the SOP |
+| [03-deployment/](03-deployment/) | App / VPN client notes |
+| [04-operations/](04-operations/) | Test, troubleshoot, teardown |
+| [scripts/](scripts/) | `vars.sh` + `01`…`07` + teardown |
+| [userdata/](userdata/) | Squid, OpenVPN, Frontend, Backend boot scripts |
+| [iam/policies/](iam/policies/) | `3tier-deploy-policy.json` |
+| [architecture/](architecture/) | Network + SG matrix |
+| [docs/](docs/) | Cost, security, deployment guide |
 
-An earlier design showed ALB → backend:8000 directly and omitted the database tier. This repository **adds the data tier**, routes API traffic **through the frontend** (or internal-only backend calls), and keeps **Squid + OpenVPN** from that design with corrected security group naming.
+## Learn first
 
-## License
+1. [01-understand/what-is-3-tier.md](01-understand/what-is-3-tier.md)
+2. [architecture/security-group-matrix.md](architecture/security-group-matrix.md)
+3. [02-infrastructure/README.md](02-infrastructure/README.md) — run order
+4. [docs/deployment-guide.md](docs/deployment-guide.md)
 
-Documentation and sample configs are provided for education. You are responsible for AWS charges in your account.
+## Go-live checklist
+
+- [ ] `http://<ALB_DNS>` shows Frontend and Backend JSON
+- [ ] `http://<ALB_DNS>/api/health` → `{"status":"ok"}`
+- [ ] Both target groups healthy
+- [ ] Frontend/Backend have **no** public IP
+- [ ] From private host: `curl` via Squid works; `--noproxy '*'` times out
+- [ ] OpenVPN + SSH to `10.0.11.10` / `10.0.11.20` works only while connected
+
+## Source SOP
+
+Place a copy of the PDF next to this repo or keep it in Downloads. This repository encodes the same phases, IP plan, security groups, scripts, and userdata.

@@ -1,27 +1,22 @@
-# High-Level Architecture
+# High-Level Architecture (SOP)
 
 ## Layers
 
 | Layer | Components |
 |-------|------------|
-| Public | ALB, OpenVPN EC2, Squid EC2 |
-| Private application | Frontend EC2, Backend EC2 |
-| Private data | RDS PostgreSQL (default) or PostgreSQL on EC2 |
+| Public | ALB (APP-SG), Squid (Remote-SG + Proxy-SG), OpenVPN (VPN-SG + Remote-SG) |
+| Private | Frontend Nginx :80 (Web-SG + Connect-SG), Backend API :8000 (Backend-SG + Connect-SG) |
 
-## Design decisions
+## Traffic
 
-1. **Backend not on ALB** — Preserves classic 3-tier teaching flow; frontend proxies API calls internally.
-2. **Squid not NAT** — Lower monthly cost for labs; requires proxy env on instances.
-3. **Single AZ first** — Cheaper; HA documented as follow-up.
-4. **OpenVPN in public subnet** — Needs UDP 1194 from your IP; pushes routes to private CIDRs.
+1. **Users** → ALB :80 → Frontend (default) and Backend `/api/*` (path rule).
+2. **Frontend / Backend** → Squid :8888 → Internet (apt, pip, git, HTTPS).
+3. **Your PC** → OpenVPN UDP 1194 (MyIP) → SSH :22 via Connect-SG.
+4. **Your PC** → Squid / VPN SSH :22 (MyIP) via Remote-SG.
 
-## Comparison to original friend diagram
+## Design choices from the SOP
 
-| Friend diagram | This repo |
-|----------------|-----------|
-| ALB → Frontend and ALB → Backend | ALB → Frontend only; Frontend → Backend |
-| No database tier | Private DB tier added |
-| APP-SG on LB | Renamed ALB-SG |
-| WEB-SG / Proxy-SG pattern | Kept, documented in SG matrix |
-
-See [security-group-matrix.md](security-group-matrix.md) and [network.md](network.md).
+- No NAT Gateway (cost + teaching egress control).
+- No public IP on Frontend/Backend.
+- Split-tunnel OpenVPN: push only `10.0.0.0/16`.
+- Path-based ALB routing for a simple public API (`/api/*`).

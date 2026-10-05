@@ -55,6 +55,10 @@ Widely used caching forward proxy. Here we use it primarily for **controlled egr
 
 ## How components connect (summary)
 
+- ALB (APP-SG) → Frontend :80 and Backend :8000 (`/api/*`)
+- Private hosts → Squid :8888 (Proxy-SG from Web-SG + Backend-SG)
+- OpenVPN → SSH via Connect-SG sourced from VPN-SG
+
 See [traffic-flow.md](traffic-flow.md) and [../architecture/security-group-matrix.md](../architecture/security-group-matrix.md).
 
 ## What comes next?

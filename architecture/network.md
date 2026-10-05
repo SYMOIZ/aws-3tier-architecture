@@ -1,36 +1,26 @@
-# Network Design
+# Network Design (SOP IP plan)
 
-## VPC CIDR
+**Region:** `ap-south-1` (change in `scripts/vars.sh` if needed).  
+**VPC:** `3tier-vpc` · `10.0.0.0/16`
 
-`10.0.0.0/16` — 65,536 addresses; split into /24 subnets.
+| Item | Name tag | CIDR / value | Route table |
+|------|----------|--------------|-------------|
+| Public subnet AZ a | 3tier-public-a | 10.0.1.0/24 | 3tier-public-rt (`0.0.0.0/0` → IGW) |
+| Public subnet AZ b | 3tier-public-b | 10.0.2.0/24 | 3tier-public-rt |
+| Private subnet AZ a | 3tier-private-a | 10.0.11.0/24 | 3tier-private-rt (local only) |
+| Private subnet AZ b | 3tier-private-b | 10.0.12.0/24 | 3tier-private-rt |
+| OpenVPN client pool | — | 10.8.0.0/24 | pushed by OpenVPN |
+| Internet Gateway | 3tier-igw | attached to VPC | — |
 
-## Subnets (single-AZ lab)
+## Fixed private IPs
 
-| Name | CIDR | Type |
-|------|------|------|
-| public-subnet-a | 10.0.1.0/24 | Public |
-| private-app-a | 10.0.10.0/24 | Private |
-| private-db-a | 10.0.20.0/24 | Private |
+| Host | IP |
+|------|-----|
+| Squid | 10.0.1.10 |
+| OpenVPN | 10.0.1.20 (+ Elastic IP) |
+| Frontend | 10.0.11.10 |
+| Backend | 10.0.11.20 |
 
-## Routing
+The private route table has **no** `0.0.0.0/0` route on purpose — that forces outbound traffic through Squid.
 
-**Public route table**
-
-- `10.0.0.0/16` → local
-- `0.0.0.0/0` → Internet Gateway
-
-**Private route tables**
-
-- `10.0.0.0/16` → local only (no 0.0.0.0/0 to NAT in default design)
-
-## DNS
-
-Enable `enableDnsHostnames` and `enableDnsSupport` on the VPC for RDS endpoints and internal hostnames.
-
-## OpenVPN routing
-
-Push route `10.0.0.0/16` (or specific private subnets) to clients so administrators reach `10.0.10.x` and `10.0.20.x`.
-
-## Upgrade path (2 AZ)
-
-Duplicate `private-app-b` and `private-db-b` in a second AZ; add second public subnet for ALB requirement (ALB needs ≥2 AZs in production—**for minimal lab, single AZ ALB is possible in some regions but not best practice**). Document ALB multi-AZ when expanding.
+ALB needs two AZs (public-a + public-b). Servers run in AZ a; AZ b is ready for a second Frontend/Backend later.

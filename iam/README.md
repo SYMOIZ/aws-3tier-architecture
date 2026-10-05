@@ -1,38 +1,19 @@
-# IAM Structure
+# IAM Structure (SOP Phase 1)
 
-## Concepts (quick reference)
+| Object | Name | Purpose |
+|--------|------|---------|
+| Policy | `3tier-deploy-policy` | EC2, ELB, Resource Groups, tags, SSM AMI lookup in one region |
+| Group | `3tier-admins` | Holds the policy |
+| User | `3tier-deployer` | Day-to-day CLI/console deployer |
 
-| Type | Use |
-|------|-----|
-| **User** | Human operator running CLI from laptop |
-| **Group** | `nexusops-deployers` — attach deploy policies |
-| **Policy** | JSON permissions document |
-| **Role** | Assumed by EC2 via instance profile |
-| **Instance profile** | Links role to EC2 |
+## Policy file
 
-**Difference:** Users have long-term credentials; roles are temporary credentials via STS.
+[policies/3tier-deploy-policy.json](policies/3tier-deploy-policy.json)
 
-## Planned groups (Part 02)
+## Other sample
 
-| Group | Purpose |
-|-------|---------|
-| `nexusops-deployers` | VPC, EC2, RDS, ELB create/describe for lab account |
-| `nexusops-readonly` | Describe-only for reviewers |
+[policies/ec2-ssm-minimal-policy.json](policies/ec2-ssm-minimal-policy.json) — optional later for instance profiles (not required by the SOP scripts).
 
-## Temporary admin access
+## Temporary root
 
-During very first account setup, some teams use broad admin **temporarily**. For this repo we target **scoped policies** in `policies/`. If you must use admin for a one-time bootstrap, document the date and remove it.
-
-## Policy files
-
-| File | Purpose |
-|------|---------|
-| [policies/ec2-ssm-minimal-policy.json](policies/ec2-ssm-minimal-policy.json) | Example EC2 role: SSM + CloudWatch logs |
-
-Additional policies (`vpc-deploy`, `rds-deploy`, `elb-deploy`) will be added with Part 02 step `02-iam/`.
-
-## Instance profiles (planned)
-
-| Role | Attached to |
-|------|-------------|
-| `nexusops-ec2-base-role` | Frontend, Backend, Squid, VPN (tuned per host) |
+Use root/admin **only** to create Phase 1 objects, then switch to `3tier-deployer`.

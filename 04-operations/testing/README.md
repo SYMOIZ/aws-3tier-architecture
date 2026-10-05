@@ -1,24 +1,29 @@
-# Testing Checklists
+# Testing Checklists (SOP)
 
-## VPC / subnets
+## Go-live
 
-- [ ] VPC CIDR is `10.0.0.0/16`
-- [ ] Public subnet route: `0.0.0.0/0` → IGW
-- [ ] Private subnets have no IGW default route
+- [ ] `http://<ALB_DNS>` shows Frontend page with Backend JSON
+- [ ] `http://<ALB_DNS>/api/health` returns `{"status":"ok"}`
+- [ ] Both target groups healthy
+- [ ] Frontend and Backend have **no** public IP
+- [ ] From private server: `curl` via Squid works; `curl --noproxy '*'` times out
+- [ ] OpenVPN connects only from MyIP; SSH to `10.0.11.10` / `10.0.11.20` only while connected
+- [ ] SSH to Squid and OpenVPN only from MyIP
+- [ ] Resource Group `3tier-rg` lists VPC, subnets, SGs, 4 instances, EIP, ALB, target groups
 
-## Security groups
+## VPN tunnel (after connect)
 
-- [ ] No `0.0.0.0/0` on port 22 for private instances
-- [ ] DB-SG allows 5432 only from BACKEND-SG
+```powershell
+Get-NetIPAddress | Where-Object IPAddress -like '10.8.0.*'
+route print | findstr 10.0.0.0
+```
 
-## VPN
+## Proxy proof (on Frontend or Backend)
 
-- [ ] Client connects on UDP 1194
-- [ ] Client can reach `10.0.10.x` after push route
-
-## Application
-
-- [ ] ALB target health: healthy
-- [ ] Backend not reachable from public internet on :8000
+```bash
+curl -sI https://ubuntu.com | head -1
+curl -sI --noproxy '*' --max-time 5 https://ubuntu.com   # should time out
+sudo apt-get update
+```
 
 Mark items **UNVERIFIED** until you run them in your account.

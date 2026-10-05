@@ -1,31 +1,18 @@
-# Troubleshooting
+# Troubleshooting (SOP)
 
-## VPN connects but no SSH to private host
+| Symptom | Likely cause | Fix |
+|---------|--------------|-----|
+| OpenVPN TLS handshake failed / timeout | Your public IP changed, or UDP 1194 blocked | `bash scripts/update-my-ip.sh`; try another network |
+| VPN connects but SSH to 10.0.11.x times out | NAT/forwarding off, or Connect-SG wrong | On VPN: `systemctl status vpn-nat`, `sysctl net.ipv4.ip_forward` (=1), `sudo iptables -t nat -S`; Connect-SG source = VPN-SG |
+| apt-get hangs on Frontend/Backend | Squid down, or Proxy-SG missing that SG | `systemctl status squid`; Proxy-SG must allow Web-SG **and** Backend-SG |
+| Squid returns 403 | Client outside 10.0.0.0/16 or port not 80/443 | Check `acl localnet` / `Safe_ports`; `sudo tail /var/log/squid/access.log` |
+| Target group unhealthy | Service down, wrong port, SG blocks ALB | `systemctl status nginx` / `backend`; Web-SG:80 and Backend-SG:8000 from APP-SG |
+| ALB 502/503 on `/api/*` | Backend target unhealthy | Same as above for Backend |
+| User-data unexpected | Script error | `sudo cat /var/log/cloud-init-output.log` |
 
-- Confirm **Connect-SG** allows 22 from **VPN-SG** (not from your laptop IP directly).
-- Confirm OpenVPN pushes route for `10.0.0.0/16`.
-- Check instance is in `private-app` subnet with correct SG attached.
-
-## Frontend unhealthy on ALB
-
-- Security group: ALB-SG → WEB-SG on port 80.
-- Health check path/port matches nginx listen port.
-- Target registered in correct VPC/subnet.
-
-## Backend cannot reach database
-
-- RDS/DB in `private-db` subnet group.
-- DB-SG inbound only from BACKEND-SG.
-- Backend uses RDS endpoint hostname, not public IP.
-
-## Private instance cannot download packages
-
-- Squid PROXY-SG allows 8888 from WEB-SG and BACKEND-SG.
-- `http_proxy` / `https_proxy` set on instance.
-- Squid can reach internet (public subnet + IGW route).
-
-## Run validation script
+## Update MyIP
 
 ```bash
-./scripts/validation/check-prerequisites.sh
+cd scripts
+bash update-my-ip.sh
 ```

@@ -1,36 +1,27 @@
-# Architecture Decision Record (ADR)
+# Architecture Decision Record
 
 ## ADR-001: Squid instead of NAT Gateway
 
-**Status:** Accepted for lab  
-**Context:** NAT Gateway has significant fixed monthly cost.  
-**Decision:** Private instances use Squid forward proxy for outbound HTTP/HTTPS.  
-**Consequences:** Must configure proxy on OS; some tools need explicit proxy env vars.
+**Status:** Accepted (SOP)  
+**Decision:** Private route table has no `0.0.0.0/0`; egress via Squid `:8888`.
 
-## ADR-002: Backend not attached to ALB
+## ADR-002: ALB path routing to Backend
 
-**Status:** Accepted  
-**Context:** Friend diagram showed ALB → backend:8000.  
-**Decision:** Only frontend is an ALB target; frontend calls backend privately.  
-**Consequences:** Clearer 3-tier story; frontend must proxy `/api` or equivalent.
+**Status:** Accepted (SOP)  
+**Decision:** Default listener → Frontend; path `/api/*` → Backend target group on port 8000.  
+**Note:** An earlier draft of this repo proposed Frontend-only ALB targets; the SOP (and original diagram) expose the API via ALB path rules.
 
-## ADR-003: RDS PostgreSQL default
+## ADR-003: No separate database tier in this SOP
 
-**Status:** Proposed (confirm at Part 02 database step)  
-**Context:** EC2 PostgreSQL is cheaper but more ops work.  
-**Decision:** Document RDS `db.t3.micro` as default; EC2 PostgreSQL as alternative appendix.  
-**Consequences:** Free Tier eligibility for 12 months on new accounts; snapshot storage costs.
+**Status:** Accepted for current SOP scope  
+**Context:** The SOP deploys Frontend + Backend only. A private DB tier can be added later as an extension.
 
-## ADR-004: Single AZ first
-
-**Status:** Accepted for initial deploy  
-**Context:** Cost and complexity for learners.  
-**Decision:** One AZ; HA patterns documented later.  
-**Consequences:** No cross-AZ redundancy during lab.
-
-## ADR-005: Manual before Terraform
+## ADR-004: Dual AZ for ALB, single AZ for servers
 
 **Status:** Accepted  
-**Context:** Repository is educational.  
-**Decision:** CLI/console steps first; Terraform module after manual path is complete.  
-**Consequences:** Slower first deploy; better understanding.
+**Decision:** Public/private subnets in AZ a and b; EC2 instances only in AZ a initially.
+
+## ADR-005: Region lock on IAM policy
+
+**Status:** Accepted  
+**Decision:** `3tier-deploy-policy` conditions on `aws:RequestedRegion = ap-south-1`.
