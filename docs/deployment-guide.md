@@ -1,48 +1,28 @@
-# Deployment Guide (SOP)
+# Deployment Guide — Console first
 
-## Phase 0 — Read (no AWS charges)
+**Deploy by hand in the AWS Console.** This repo has **no Terraform**.
+
+## Phase 0 — Read (no charges)
 
 1. [../README.md](../README.md)
 2. [../01-understand/](../01-understand/)
 3. [cost.md](cost.md) — set a billing alarm
 
-## Phase 1 — IAM (console)
+## Phase 1–9 — Console guides
 
-[../02-infrastructure/01-iam/README.md](../02-infrastructure/01-iam/README.md)
+Follow [../02-infrastructure/README.md](../02-infrastructure/README.md) in order.
 
-## Phases 2–8 — Scripts
+When launching EC2, paste files from [../userdata/](../userdata/).  
+For Frontend/Backend, replace `__SQUID_IP__` with `10.0.1.10` and `__PROXY_PORT__` with `8888` before paste.
 
-```bash
-cd scripts
-bash 01-network.sh && bash 02-security-groups.sh && bash 03-keypair-ami.sh \
-  && bash 04-squid.sh && bash 05-openvpn.sh && bash 06-app-servers.sh && bash 07-alb.sh
-```
+## Phase 9 — VPN
 
-If a script fails midway, fix the cause and rerun **only that script**; IDs already created are kept in `ids.sh`.
+[../03-deployment/vpn-client.md](../03-deployment/vpn-client.md)
 
-## Phase 9 — VPN client
+## Cleanup
 
-```bash
-source ./vars.sh
-ssh -i 3tier-key.pem ubuntu@$VPN_EIP
-sudo make-client my-pc "$VPN_EIP"
-exit
-scp -i 3tier-key.pem ubuntu@$VPN_EIP:~/my-pc.ovpn .
-```
+[../04-operations/cleanup/README.md](../04-operations/cleanup/README.md) — delete ALB first, then instances, EIP, SGs, VPC.
 
-Import `my-pc.ovpn` into OpenVPN Connect / GUI, then:
+## Optional scripts
 
-```bash
-ssh -i 3tier-key.pem ubuntu@10.0.11.10
-ssh -i 3tier-key.pem ubuntu@10.0.11.20
-```
-
-## Values you supply
-
-| Variable | Source |
-|----------|--------|
-| Region | `vars.sh` (`ap-south-1` default) |
-| MY_IP | Auto via `checkip.amazonaws.com` |
-| Access keys | IAM user `3tier-deployer` |
-
-Never commit `.pem` or `.ovpn` files.
+Only if you choose automation later: [../scripts/README.md](../scripts/README.md). Still not Terraform.

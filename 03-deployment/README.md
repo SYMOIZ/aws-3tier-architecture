@@ -1,6 +1,8 @@
 # Part 03 — Deploy and Configure the Application
 
-Sample apps are installed by **user-data** in Phase 7:
+**VPN client (hand):** [vpn-client.md](vpn-client.md)
+
+Sample apps are installed by **EC2 User data** (paste in Console) in Phase 7:
 
 | Host | User-data | Service |
 |------|-----------|---------|

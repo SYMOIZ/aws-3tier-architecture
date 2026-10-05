@@ -1,34 +1,40 @@
-# Part 02 — Build AWS Infrastructure (SOP phases)
+# Part 02 — Build by hand (AWS Console)
 
-Follow this order. Do not skip validation between major steps.
+**Primary path: AWS Management Console (click-by-click).**  
+There is **no Terraform** in this project. Bash scripts under `scripts/` are optional shortcuts only.
 
-| Phase | Script / action | Why |
-|-------|-----------------|-----|
-| 1 | IAM + Resource Group ([01-iam/](01-iam/)) | Least-privilege deployer before infra |
-| 2 | [scripts/01-network.sh](../scripts/01-network.sh) | VPC/subnets/IGW/routes |
-| 3 | [scripts/02-security-groups.sh](../scripts/02-security-groups.sh) | Seven SGs from the matrix |
-| 4 | [scripts/03-keypair-ami.sh](../scripts/03-keypair-ami.sh) | ED25519 key + Ubuntu 24.04 AMI |
-| 5 | [scripts/04-squid.sh](../scripts/04-squid.sh) | Egress proxy **before** private apps |
-| 6 | [scripts/05-openvpn.sh](../scripts/05-openvpn.sh) | Admin path into private subnet |
-| 7 | [scripts/06-app-servers.sh](../scripts/06-app-servers.sh) | Frontend + Backend (need Squid) |
-| 8 | [scripts/07-alb.sh](../scripts/07-alb.sh) | Public entry; needs healthy targets |
-| 9 | Client `.ovpn` + connect | SSH to private IPs |
-| — | [scripts/99-teardown.sh](../scripts/99-teardown.sh) | Stop charges |
+| Phase | Guide | Create |
+|-------|--------|--------|
+| 1 | [01-iam/](01-iam/) | IAM policy, group, user, Resource Group |
+| 2 | [02-vpc/](02-vpc/) | VPC, subnets, IGW, route tables |
+| 3 | [03-security-groups/](03-security-groups/) | Seven security groups |
+| 4–5 | [04-squid/](04-squid/) | Key pair + Squid EC2 |
+| 6 | [05-openvpn/](05-openvpn/) | OpenVPN EC2 + Elastic IP |
+| 7 | [06-app-servers/](06-app-servers/) | Frontend + Backend (private) |
+| 8 | [07-load-balancer/](07-load-balancer/) | ALB + target groups |
+| 9 | [../03-deployment/vpn-client.md](../03-deployment/vpn-client.md) | Connect OpenVPN + SSH |
+| — | [../04-operations/cleanup/README.md](../04-operations/cleanup/README.md) | Delete resources by hand |
 
-## Prerequisites
+## Fixed values (use everywhere)
 
-- AWS CLI v2, Git Bash (Windows) or WSL
-- Admin/root for Phase 1 only, then use `3tier-deployer`
-- Working directory: `scripts/` (creates `ids.sh` and `3tier-key.pem`)
+| Item | Value |
+|------|--------|
+| Region | `ap-south-1` (Mumbai) — or change consistently |
+| VPC CIDR | `10.0.0.0/16` |
+| Public A / B | `10.0.1.0/24` / `10.0.2.0/24` |
+| Private A / B | `10.0.11.0/24` / `10.0.12.0/24` |
+| Squid IP | `10.0.1.10` |
+| VPN IP | `10.0.1.20` |
+| Frontend IP | `10.0.11.10` |
+| Backend IP | `10.0.11.20` |
+| Instance type | `t3.micro` |
+| AMI | Ubuntu Server 24.04 LTS |
+| Tag on every resource | `Project` = `3tier` |
 
-```bash
-cd scripts
-source ./vars.sh
-echo "$MY_IP"
-aws sts get-caller-identity
-```
+## Cost warning
 
-## Cost gates
+ALB is **paid**. Tear down when done. See [../docs/cost.md](../docs/cost.md).
 
-Before Phase 8 (ALB): ALB is **not** Free Tier — see [../docs/cost.md](../docs/cost.md).  
-Elastic IP is free while attached to a running instance; release on teardown.
+## Optional (not required)
+
+If you later prefer CLI automation: [../scripts/README.md](../scripts/README.md). Still not Terraform.

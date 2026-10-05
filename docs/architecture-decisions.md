@@ -25,3 +25,8 @@
 
 **Status:** Accepted  
 **Decision:** `3tier-deploy-policy` conditions on `aws:RequestedRegion = ap-south-1`.
+
+## ADR-006: Manual Console deploy, not Terraform
+
+**Status:** Accepted  
+**Decision:** Primary path is AWS Console click-by-click. Optional AWS CLI bash scripts only. **No Terraform** in this repository so learners see each resource.
