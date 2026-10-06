@@ -1,31 +1,29 @@
 # Secure AWS 3-Tier (Squid + OpenVPN)
 
-**Deploy this diagram only.** No Terraform. No extra phases.
-
-![Architecture](architecture/friend-diagram.jpg)
+**Your friend diagram only.** No Terraform. No extra learning phases.
 
 ```text
 INTERNET
    │
-   ├── ALB :80 ──────────► Frontend :80
-   │                 └──► Backend  :8000
-   ├── OpenVPN :1194 ────► SSH private servers (admin)
-   └── Squid :8888 ◄────── Frontend + Backend (outbound packages)
+   ├── ALB :80 (APP-SG) ─────► Frontend :80  (Web-SG)
+   │                      └──► Backend  :8000 (Backend-SG)
+   ├── OpenVPN :1194 (VPN-SG, MyIP) ──► SSH :22 (Connect-SG)
+   └── Squid :8888 (Proxy-SG) ◄── Frontend + Backend outbound
 ```
 
 | Who | Entry |
 |-----|--------|
 | Users (browser) | **ALB** |
 | Admin (you) | **OpenVPN** → SSH |
-| Private servers need internet | **Squid** (not NAT) |
+| Private servers need packages | **Squid** |
 
 ## Deploy
 
 ### → Open **[DEPLOY.md](DEPLOY.md)** ← only file you need
 
-9 steps: VPC → SG → Key → Squid → OpenVPN → Apps → ALB → Test → Cleanup
+9 steps: VPC → SG → Key → Squid → OpenVPN → Apps → ALB → Test → Cleanup  
 
-Boot scripts to paste in EC2 User data: [`userdata/`](userdata/)
+Paste boot scripts from [`userdata/`](userdata/) into EC2 User data.
 
 ## Cost
 
