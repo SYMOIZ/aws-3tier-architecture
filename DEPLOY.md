@@ -1,7 +1,12 @@
-# Deploy — Friend architecture only (no extra steps)
+# Deploy — Friend architecture (checklist)
 
-This is the **only** deploy guide you need.  
 Architecture = your diagram: **Public** (ALB + Squid + OpenVPN) → **Private** (Frontend + Backend).
+
+## Diagram
+
+![Architecture diagram](architecture/friend-diagram.jpg)
+
+SVG version: [`architecture/diagram.svg`](architecture/diagram.svg)
 
 ```text
 INTERNET
@@ -12,8 +17,7 @@ INTERNET
    └─► Squid :8888 (Proxy-SG) ◄── Frontend + Backend (outbound)
 ```
 
-**Region:** `ap-south-1` · **Ubuntu 24.04** · **t3.micro**  
-**Tag everything:** `Project=3tier`
+**Region:** `ap-south-1` · **Ubuntu 24.04** · **t3.micro** · Tag: `Project=3tier`
 
 | Host | Subnet | IP | Security groups |
 |------|--------|-----|-----------------|
@@ -23,133 +27,136 @@ INTERNET
 | Backend | private-a | `10.0.11.20` | Backend-SG + Connect-SG |
 | ALB | public-a + public-b | AWS | APP-SG |
 
-Also create: public-b `10.0.2.0/24`, private-b `10.0.12.0/24` (ALB needs 2 AZs).
+Also: public-b `10.0.2.0/24`, private-b `10.0.12.0/24` (ALB needs 2 AZs).
 
-**COST:** ALB is paid. Delete when done (Step 9).
-
----
-
-## Step 1 — VPC (Console → VPC)
-
-1. Create VPC `3tier-vpc` CIDR `10.0.0.0/16` → enable DNS hostnames  
-2. Subnets:  
-   - `3tier-public-a` AZ-a `10.0.1.0/24` → enable auto-assign public IP  
-   - `3tier-public-b` AZ-b `10.0.2.0/24` → enable auto-assign public IP  
-   - `3tier-private-a` AZ-a `10.0.11.0/24`  
-   - `3tier-private-b` AZ-b `10.0.12.0/24`  
-3. IGW `3tier-igw` → attach to VPC  
-4. Route table `3tier-public-rt`: `0.0.0.0/0` → IGW → associate both public subnets  
-5. Route table `3tier-private-rt`: **local only** (no NAT) → associate both private subnets  
+**COST:** ALB is paid → finish with Step 9.
 
 ---
 
-## Step 2 — Security groups (create all empty, then add rules)
+## Master checklist
 
-| Name | Inbound |
-|------|---------|
-| APP-SG | TCP 80 from `0.0.0.0/0` |
-| Web-SG | TCP 80 from APP-SG |
-| Backend-SG | TCP 8000 from APP-SG |
-| Proxy-SG | TCP 8888 from Web-SG **and** Backend-SG |
-| Remote-SG | TCP 22 from **My IP** |
-| VPN-SG | UDP 1194 from **My IP** |
-| Connect-SG | TCP 22 from VPN-SG |
+- [ ] Step 1 — VPC
+- [ ] Step 2 — Security groups
+- [ ] Step 3 — Key pair
+- [ ] Step 4 — Squid
+- [ ] Step 5 — OpenVPN + client `.ovpn`
+- [ ] Step 6 — Frontend + Backend
+- [ ] Step 7 — ALB
+- [ ] Step 8 — Test all boxes below
+- [ ] Step 9 — Cleanup (when finished)
 
-Outbound = default allow all.
+---
+
+## Step 1 — VPC
+
+- [ ] VPC `3tier-vpc` = `10.0.0.0/16`, DNS hostnames ON
+- [ ] Subnet `3tier-public-a` AZ-a `10.0.1.0/24` + auto-assign public IP
+- [ ] Subnet `3tier-public-b` AZ-b `10.0.2.0/24` + auto-assign public IP
+- [ ] Subnet `3tier-private-a` AZ-a `10.0.11.0/24`
+- [ ] Subnet `3tier-private-b` AZ-b `10.0.12.0/24`
+- [ ] IGW `3tier-igw` attached
+- [ ] Public RT: `0.0.0.0/0` → IGW → both public subnets
+- [ ] Private RT: **local only** (no NAT) → both private subnets
+
+---
+
+## Step 2 — Security groups
+
+Create all empty first, then rules:
+
+- [ ] `APP-SG` — TCP 80 from `0.0.0.0/0`
+- [ ] `Web-SG` — TCP 80 from APP-SG
+- [ ] `Backend-SG` — TCP 8000 from APP-SG
+- [ ] `Proxy-SG` — TCP 8888 from Web-SG **and** Backend-SG
+- [ ] `Remote-SG` — TCP 22 from **My IP**
+- [ ] `VPN-SG` — UDP 1194 from **My IP**
+- [ ] `Connect-SG` — TCP 22 from VPN-SG
 
 ---
 
 ## Step 3 — Key pair
 
-EC2 → Key pairs → Create `3tier-key` (ED25519, `.pem`) → save file.
+- [ ] Created `3tier-key` (ED25519, `.pem`)
+- [ ] File saved safely on PC
 
 ---
 
-## Step 4 — Squid (must be before Frontend/Backend)
+## Step 4 — Squid
 
-Launch instance:
+Paste [`userdata/squid.sh`](userdata/squid.sh) into User data.
 
-- Name `squid-proxy`, Ubuntu 24.04, t3.micro, key `3tier-key`  
-- Subnet `3tier-public-a`, public IP **Enable**, primary IP `10.0.1.10`  
-- SG: Remote-SG + Proxy-SG  
-- User data = paste full file [`userdata/squid.sh`](userdata/squid.sh)  
-
-Check: SSH `ubuntu@<public-ip>` → `sudo systemctl status squid`
+- [ ] Instance `squid-proxy` in `3tier-public-a`
+- [ ] Primary IP `10.0.1.10`, public IP ON
+- [ ] SG = Remote-SG + Proxy-SG
+- [ ] SSH works from MyIP
+- [ ] `sudo systemctl status squid` = active
+- [ ] Port 8888 listening
 
 ---
 
 ## Step 5 — OpenVPN
 
-Launch:
+Paste [`userdata/openvpn.sh`](userdata/openvpn.sh) into User data.
 
-- Name `openvpn-server`, same AMI/type/key  
-- Subnet `3tier-public-a`, primary IP `10.0.1.20`  
-- SG: VPN-SG + Remote-SG  
-- User data = paste [`userdata/openvpn.sh`](userdata/openvpn.sh)  
-
-Then:
-
-1. Actions → Networking → **Stop source/destination check**  
-2. Allocate Elastic IP → Associate to this instance  
-3. SSH → `sudo make-client my-pc <EIP>` → `scp` the `.ovpn` to your PC  
-4. Connect with OpenVPN Connect app  
+- [ ] Instance `openvpn-server` IP `10.0.1.20`
+- [ ] SG = VPN-SG + Remote-SG
+- [ ] Source/dest check **stopped**
+- [ ] Elastic IP associated
+- [ ] `sudo make-client my-pc <EIP>` done
+- [ ] `my-pc.ovpn` copied to PC
+- [ ] OpenVPN Connect succeeds
 
 ---
 
-## Step 6 — Frontend + Backend (no public IP)
+## Step 6 — Frontend + Backend
 
-**Edit before paste:** in both userdata files set `__SQUID_IP__` = `10.0.1.10`, `__PROXY_PORT__` = `8888`.
+Before paste: `__SQUID_IP__` → `10.0.1.10`, `__PROXY_PORT__` → `8888`.
 
-| Name | IP | SG | User data |
-|------|-----|-----|-----------|
-| frontend | 10.0.11.10 | Web-SG + Connect-SG | [`userdata/frontend.sh`](userdata/frontend.sh) |
-| backend | 10.0.11.20 | Backend-SG + Connect-SG | [`userdata/backend.sh`](userdata/backend.sh) |
-
-Subnet = `3tier-private-a`, auto-assign public IP = **Disable**.
-
-SSH only after VPN connected:  
-`ssh -i 3tier-key.pem ubuntu@10.0.11.10`
+- [ ] `frontend` — `10.0.11.10`, Web-SG + Connect-SG, **no public IP**, userdata [`frontend.sh`](userdata/frontend.sh)
+- [ ] `backend` — `10.0.11.20`, Backend-SG + Connect-SG, **no public IP**, userdata [`backend.sh`](userdata/backend.sh)
+- [ ] VPN connected → SSH `ubuntu@10.0.11.10` works
+- [ ] VPN connected → SSH `ubuntu@10.0.11.20` works
 
 ---
 
 ## Step 7 — ALB (paid)
 
-1. Target group `3tier-frontend-tg` HTTP 80, health `/`, register frontend  
-2. Target group `3tier-backend-tg` HTTP 8000, health `/api/health`, register backend  
-3. ALB `3tier-alb` internet-facing, subnets public-a + public-b, SG = **APP-SG only**  
-4. Listener :80 → default forward frontend-tg  
-5. Rule priority 10: path `/api/*` → backend-tg  
-
-Open `http://<ALB-DNS>` — done.
-
----
-
-## Step 8 — Test (1 minute)
-
-- Browser: ALB URL shows Frontend + Backend JSON  
-- `http://<ALB-DNS>/api/health` → `{"status":"ok"}`  
-- VPN on → SSH to `10.0.11.10` / `10.0.11.20`  
-- On private host: `curl https://ubuntu.com` works (via Squid); without proxy it fails  
+- [ ] TG `3tier-frontend-tg` HTTP 80, health `/`, frontend registered
+- [ ] TG `3tier-backend-tg` HTTP 8000, health `/api/health`, backend registered
+- [ ] ALB `3tier-alb` internet-facing, public-a + public-b, SG = **APP-SG only**
+- [ ] Listener :80 default → frontend-tg
+- [ ] Rule priority 10: path `/api/*` → backend-tg
+- [ ] Both targets **Healthy**
 
 ---
 
-## Step 9 — Cleanup / reset (same place)
+## Step 8 — Test checklist
 
-Delete in order:
-
-1. ALB  
-2. Both target groups  
-3. Terminate 4 instances  
-4. Release Elastic IP  
-5. Delete 7 security groups  
-6. Delete 4 subnets → 2 route tables → detach/delete IGW → delete VPC  
-7. Delete key pair (optional)  
+- [ ] `http://<ALB-DNS>` shows Frontend page + Backend JSON
+- [ ] `http://<ALB-DNS>/api/health` → `{"status":"ok"}`
+- [ ] Frontend/Backend have **empty** Public IPv4
+- [ ] On private host: `curl https://ubuntu.com` works (via Squid)
+- [ ] On private host: direct internet without proxy fails/times out
+- [ ] SSH to private hosts only works while VPN is connected
 
 ---
 
-## Optional: one-command CLI (same architecture)
+## Step 9 — Cleanup / reset checklist
 
-Only if you prefer scripts instead of Console:
+- [ ] Delete ALB
+- [ ] Delete both target groups
+- [ ] Terminate Squid, OpenVPN, Frontend, Backend
+- [ ] Release Elastic IP
+- [ ] Delete all 7 security groups
+- [ ] Delete 4 subnets
+- [ ] Delete 2 route tables
+- [ ] Detach + delete IGW
+- [ ] Delete VPC
+- [ ] Delete key pair (optional)
+
+---
+
+## Optional CLI (same checklist order)
 
 ```bash
 cd scripts

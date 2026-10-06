@@ -1,6 +1,12 @@
 # Secure AWS 3-Tier (Squid + OpenVPN)
 
-**Your friend diagram only.** No Terraform. No extra learning phases.
+Friend architecture only. **No Terraform. No extra phases.**
+
+## Architecture diagram
+
+![Architecture — ALB, Squid, OpenVPN, Frontend, Backend](architecture/friend-diagram.jpg)
+
+Also in SVG: [`architecture/diagram.svg`](architecture/diagram.svg)
 
 ```text
 INTERNET
@@ -17,14 +23,40 @@ INTERNET
 | Admin (you) | **OpenVPN** → SSH |
 | Private servers need packages | **Squid** |
 
-## Deploy
+## Master checklist
 
-### → Open **[DEPLOY.md](DEPLOY.md)** ← only file you need
+Tick as you go. Full detail → **[DEPLOY.md](DEPLOY.md)**
 
-9 steps: VPC → SG → Key → Squid → OpenVPN → Apps → ALB → Test → Cleanup  
+### Setup
+- [ ] AWS account + region `ap-south-1`
+- [ ] Note your public IP (MyIP)
 
-Paste boot scripts from [`userdata/`](userdata/) into EC2 User data.
+### Build
+- [ ] **1. VPC** — VPC, 4 subnets, IGW, public + private routes
+- [ ] **2. Security groups** — APP / Web / Backend / Proxy / Remote / VPN / Connect
+- [ ] **3. Key pair** — `3tier-key.pem` saved
+- [ ] **4. Squid** — `10.0.1.10`, paste `userdata/squid.sh`, service running
+- [ ] **5. OpenVPN** — `10.0.1.20` + EIP, `.ovpn` on PC, VPN connects
+- [ ] **6. Frontend + Backend** — `10.0.11.10` / `10.0.11.20`, no public IP
+- [ ] **7. ALB** — TGs + path `/api/*` (**paid**)
+
+### Test
+- [ ] `http://<ALB-DNS>` shows Frontend + Backend JSON
+- [ ] `/api/health` → `{"status":"ok"}`
+- [ ] Target groups **Healthy**
+- [ ] VPN → SSH to private IPs works
+- [ ] Squid path works on private hosts
+
+### Cleanup / reset
+- [ ] Delete ALB → TGs → 4 EC2 → EIP → SGs → subnets → VPC  
+  (step-by-step boxes in [DEPLOY.md](DEPLOY.md))
+
+## Full steps with checklists
+
+→ **[DEPLOY.md](DEPLOY.md)**
+
+Boot scripts: [`userdata/`](userdata/)
 
 ## Cost
 
-ALB is **paid**. Cleanup = Step 9 in `DEPLOY.md`.
+ALB is **paid**. Use Cleanup checklist when done.
