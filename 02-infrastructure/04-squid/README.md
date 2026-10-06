@@ -1,5 +1,9 @@
 # Phase 4–5 — Key pair and Squid (Console)
 
+> **What is Squid?** A forward proxy: private Frontend/Backend use `http://10.0.1.10:8888` to download packages. Without Squid (and without NAT), they have no internet.  
+> **Where does `userdata/squid.sh` run?** On the Squid EC2 instance at **first boot** after you paste it into User data — not in Git Bash on your PC.  
+> Full flow: [root README](../../README.md).
+
 ## Objective
 
 Create an SSH key, then launch Squid in the public subnet **before** Frontend/Backend (they install packages through Squid).

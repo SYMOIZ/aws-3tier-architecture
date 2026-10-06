@@ -1,4 +1,6 @@
-# Cleanup by hand (Console)
+# Cleanup / reset by hand (Console)
+
+**All teardown / reset steps are in this file.** You do not need other folders for cleanup.
 
 Delete in this order so dependencies do not block you.
 
