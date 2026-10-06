@@ -9,10 +9,10 @@
 
 ## Traffic
 
-1. **Users** → ALB :80 → Frontend (default) and Backend `/api/*` (path rule).
-2. **Frontend / Backend** → Squid :8888 → Internet (apt, pip, git, HTTPS).
-3. **Your PC** → OpenVPN UDP 1194 (MyIP) → SSH :22 via Connect-SG.
-4. **Your PC** → Squid / VPN SSH :22 (MyIP) via Remote-SG.
+1. **Employees (users):** Internet → ALB :80 → Frontend `/` and Backend `/api/*` — **ALB is for the website, not for admin.**
+2. **Admin:** Internet → OpenVPN :1194 → SSH — **no ALB.**
+3. **Servers outbound:** Frontend/Backend → Squid :8888 → Internet (packages only).
+4. **Admin SSH to Squid/VPN boxes:** MyIP → port 22 (Remote-SG).
 
 ## Design choices from the SOP
 

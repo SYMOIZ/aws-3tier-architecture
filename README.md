@@ -6,55 +6,74 @@ A **hand-deployed** AWS lab (AWS Console clicks — **not Terraform**): public A
 
 ## 1. Introduction diagram (start here)
 
-Read this picture once. Everything else is just building these boxes in order.
+**Internet is at the top.** Traffic flows **down** into AWS.
+
+### Who uses what? (important)
+
+| Person | How they enter | Uses ALB? |
+|--------|----------------|-----------|
+| **Employee / user** (browser) | Internet → **ALB :80** → website + API | **Yes** — ALB is for them |
+| **Admin** (you) | Internet → **OpenVPN** → SSH to private servers | **No** — admin does **not** use ALB |
+
+**ALB is not an “admin tool”.**  
+It is the **public front door for the web app** (many users, HTTP).  
+Admin work (SSH, fix servers) goes through **OpenVPN only**.
 
 ```text
-                         YOUR LAPTOP / USERS
-                                 │
-            ┌────────────────────┼────────────────────┐
-            │                    │                    │
-            ▼                    ▼                    ▼
-     Browse website        OpenVPN tunnel        Admin SSH
-     http://ALB            UDP 1194 (MyIP)       to Squid/VPN
-            │                    │               (MyIP only)
-            ▼                    │
-   ┌────────────────┐            │
-   │  PUBLIC LAYER  │            │
-   │                │            │
-   │  ALB :80       │            │
-   │  Squid :8888   │◄── packages / apt / pip (outbound)
-   │  OpenVPN :1194 │────────────┘
-   └────────┬───────┘
-            │ only ALB reaches apps
-            ▼
-   ┌────────────────┐
-   │ PRIVATE LAYER  │   no public IP, no NAT Gateway
-   │                │
-   │ Frontend :80   │◄── ALB default rule
-   │ Backend  :8000 │◄── ALB path /api/*
-   └────────────────┘
+                         INTERNET  (top)
+                              │
+          ┌───────────────────┼───────────────────┐
+          │                   │                   │
+          ▼                   ▼                   ▼
+   ┌─────────────┐    ┌──────────────┐    ┌──────────────┐
+   │ EMPLOYEES   │    │ ADMIN (you)  │    │ (outbound)   │
+   │ browser     │    │ OpenVPN only │    │ Squid later  │
+   └──────┬──────┘    └──────┬───────┘    └──────────────┘
+          │                  │
+          ▼                  ▼
+   ┌──────────────────────────────────────────────┐
+   │              PUBLIC LAYER                    │
+   │  ALB :80          OpenVPN :1194   Squid:8888 │
+   │  (users only)     (admin only)    (servers'  │
+   │                                   way OUT)   │
+   └──────────┬─────────────────┬─────────────────┘
+              │                 │
+              ▼                 ▼
+   ┌──────────────────┐   SSH to private IPs
+   │  PRIVATE LAYER   │◄──────────────────
+   │  Frontend :80    │◄── ALB default (/)
+   │  Backend  :8000  │◄── ALB /api/*
+   └──────────────────┘
 ```
 
 ```mermaid
 flowchart TB
-  Users([Users / Admin laptop])
-  ALB[ALB :80]
-  Squid[Squid :8888<br/>forward proxy]
-  VPN[OpenVPN :1194]
-  FE[Frontend Nginx :80]
-  BE[Backend API :8000]
-  Net([Internet])
+  Internet([INTERNET])
 
-  Users -->|HTTP| ALB
-  Users -->|VPN| VPN
-  ALB -->|default| FE
+  subgraph Public["PUBLIC LAYER"]
+    ALB["ALB :80<br/>users / website only"]
+    VPN["OpenVPN :1194<br/>admin only"]
+    Squid["Squid :8888<br/>outbound proxy"]
+  end
+
+  subgraph Private["PRIVATE LAYER"]
+    FE["Frontend :80"]
+    BE["Backend :8000"]
+  end
+
+  Internet -->|employees browse HTTP| ALB
+  Internet -->|admin VPN MyIP| VPN
+  ALB -->|/| FE
   ALB -->|/api/*| BE
-  FE -->|apt/pip via proxy| Squid
-  BE -->|apt/pip via proxy| Squid
-  Squid --> Net
-  VPN -.->|SSH after tunnel| FE
-  VPN -.->|SSH after tunnel| BE
+  VPN -.->|SSH| FE
+  VPN -.->|SSH| BE
+  FE -->|apt/pip| Squid
+  BE -->|apt/pip| Squid
+  Squid -->|fetch packages| Internet
 ```
+
+**Why ALB still makes sense in a small lab?**  
+Even with one Frontend + one Backend, ALB gives you: one public URL, health checks, and path `/api/*` → Backend — without putting public IPs on private servers. Later you can add more Frontend instances behind the same ALB (real “load balancing”). For admin SSH you never need ALB.
 
 | Fixed IPs (use these values everywhere) | |
 |---|---|
